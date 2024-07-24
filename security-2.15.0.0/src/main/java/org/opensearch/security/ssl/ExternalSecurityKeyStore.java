@@ -127,6 +127,12 @@ public class ExternalSecurityKeyStore implements SecurityKeyStore {
         // NO-OP: since this class uses externalSslContext there are no http certs
         return null;
     }
+ 
+    @Override
+    public X509Certificate[] getCaCerts() {
+        // NO-OP: since this class uses externalSslContext there are no http certs
+        return null;
+    }
 
     @Override
     public String getSubjectAlternativeNames(X509Certificate cert) {

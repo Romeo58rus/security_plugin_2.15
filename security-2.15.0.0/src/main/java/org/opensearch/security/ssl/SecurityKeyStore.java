@@ -44,4 +44,6 @@ public interface SecurityKeyStore {
     X509Certificate[] getTransportCerts();
 
     X509Certificate[] getHttpCerts();
+
+    X509Certificate[] getCaCerts();
 }

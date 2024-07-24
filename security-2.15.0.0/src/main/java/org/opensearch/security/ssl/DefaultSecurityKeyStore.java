@@ -136,6 +136,7 @@ public class DefaultSecurityKeyStore implements SecurityKeyStore {
     private SslContext transportClientSslContext;
     private X509Certificate[] transportCerts;
     private X509Certificate[] httpCerts;
+    private X509Certificate[] CaCerts;
     private final Environment env;
 
     public DefaultSecurityKeyStore(final Settings settings, final Path configPath) {
@@ -460,6 +461,7 @@ public class DefaultSecurityKeyStore implements SecurityKeyStore {
                 }
 
                 validateNewCerts(transportCerts, certFromFile.getCerts());
+                validateNewCerts(CaCerts, certFromFile.getCaCerts());
                 transportServerSslContext = buildSSLServerContext(
                     certFromFile.getServerPemKey(),
                     certFromFile.getServerPemCert(),
@@ -599,6 +601,7 @@ public class DefaultSecurityKeyStore implements SecurityKeyStore {
                     httpClientAuthMode
                 );
                 setHttpSSLCerts(certFromFile.getCerts());
+                setCaCerts(certFromFile.getCaCerts());
 
             } catch (final Exception e) {
                 logExplanation(e);
@@ -641,7 +644,7 @@ public class DefaultSecurityKeyStore implements SecurityKeyStore {
 
         // Check if new X509 certs have valid IssuerDN, SubjectDN or SAN
         if (!hasValidDNs(currentX509Certs, newX509Certs)) {
-            throw new Exception("New Certs do not have valid Issuer DN, Subject DN or SAN.");
+            throw new Exception("The Root CA certificate has been replaced, a restart is required. WARN! Before restarting, check the validity of the Admin's certificate.");
         }
     }
 
@@ -653,18 +656,30 @@ public class DefaultSecurityKeyStore implements SecurityKeyStore {
      * @throws Exception if certificate is invalid.
      */
     private boolean hasValidDNs(final X509Certificate[] currentX509Certs, final X509Certificate[] newX509Certs) {
-
+ 
         final Function<? super X509Certificate, String> formatDNString = cert -> {
-            final String issuerDn = cert != null && cert.getIssuerX500Principal() != null ? cert.getIssuerX500Principal().getName() : "";
-            final String subjectDn = cert != null && cert.getSubjectX500Principal() != null ? cert.getSubjectX500Principal().getName() : "";
+            final String issuerDn = cert !=null && cert.getIssuerX500Principal() != null ? cert.getIssuerX500Principal().getName() : "";
+            final String subjectDn = cert !=null && cert.getSubjectX500Principal() != null ? cert.getSubjectX500Principal().getName() : "";
             final String san = getSubjectAlternativeNames(cert);
-            return String.format("%s/%s/%s", issuerDn, subjectDn, san);
+            log.debug("Checking the Root CA or not : {}", subjectDn);
+            if (issuerDn != null && subjectDn != null && issuerDn.equals(subjectDn)) {
+                log.debug("This is the Root CA certificate : {}", subjectDn);
+                return String.format("%s/%s/%s", issuerDn, subjectDn, san);
+            }
+            else {
+                log.debug("This is not a Root CA certificate, skip the DN check : {}", subjectDn);
+                return String.format("This is not a Root CA cert");
+            }
         };
+            final List<String> currentCertDNList = Arrays.stream(currentX509Certs)
+                .map(formatDNString)
+                .sorted()
+                .collect(Collectors.toList());
 
-        final List<String> currentCertDNList = Arrays.stream(currentX509Certs).map(formatDNString).sorted().collect(Collectors.toList());
-
-        final List<String> newCertDNList = Arrays.stream(newX509Certs).map(formatDNString).sorted().collect(Collectors.toList());
-
+            final List<String> newCertDNList = Arrays.stream(newX509Certs)
+                .map(formatDNString)
+                .sorted()
+                .collect(Collectors.toList());
         return currentCertDNList.equals(newCertDNList);
     }
 
@@ -781,6 +796,11 @@ public class DefaultSecurityKeyStore implements SecurityKeyStore {
     private void setHttpSSLCerts(X509Certificate[] certs) {
         this.httpCerts = certs;
     }
+ 
+    private void setCaCerts(X509Certificate[] certs) {
+        this.CaCerts = certs;
+    }
+
 
     private void logOpenSSLInfos() {
         if (OpenSearchSecuritySSLPlugin.OPENSSL_SUPPORTED && OpenSsl.isAvailable()) {
