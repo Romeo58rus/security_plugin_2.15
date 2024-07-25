@@ -29,6 +29,7 @@ public class CertFromFile {
     private final File clientTrustedCas;
 
     private final X509Certificate[] loadedCerts;
+    private final X509Certificate[] loadedCA;
 
     public CertFromFile(CertFileProps clientCertProps, CertFileProps serverCertProps) throws Exception {
         this.serverCertProps = serverCertProps;

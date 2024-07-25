@@ -780,7 +780,9 @@ public class DefaultSecurityKeyStore implements SecurityKeyStore {
     public X509Certificate[] getHttpCerts() {
         return httpCerts;
     }
-
+    @Override
+    public X509Certificate[] getCaCerts() { return CaCerts; }
+  
     /**
      * Sets the transport X509Certificates.
      * @param certs          New X509 Certificates
